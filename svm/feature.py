@@ -42,9 +42,9 @@ def analyze_dna_data(dna_seq_file):
 
 #generate a certain format feature vector with feature matrix
 #we can free redirect standard output stream,such as a file
-def generate_feature(feature_matrix, label, format = 'self'):
+def generate_feature(feature_matrix, label, format = 'libsvm'):
 	if format == 'libsvm':
-		fromater = libsvm_format
+		formater = libsvm_format
 	elif format == 'self':
 		formater = self_format
 	else:

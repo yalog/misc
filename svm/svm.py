@@ -27,28 +27,39 @@ class SVM:
 		smo = SMO(self.__y, self.__x, len(self.__y), cost, gamma, kernel_type)
 		resolve = smo.solve()
 		
-		model  = {}
+		model = {}
 		model['kernel_type'] = kernel_type
 		model['gamma'] = gamma
 		model['cost'] = cost
 		model['rho'] = resolve[1]
-		model['sv'] = {}
+		model['sv'] = []
 		for i, v in resolve[0]:
-			model['sv'][i] = {}
-			model['sv'][i]['ya'] = self.__y[i] * v
-			model['sv'][i]['vector'] = self.__x[i]
+			point = {}
+			point['ya'] = self.__y[i] * v
+			point['vector'] = self.__x[i]
+			model['sv'].append(point)
 
 		self.__model = model
 
 	#predict target value which input points corresponding
 	def predict(self):
-		self.__model = model
 		target = {}
 
 		for i, v in enumerate(self.__x):
 			target[i] = self.decision(v)
 		
 		return target
+	
+	#append accuracy rate
+	def predict_known(self):
+		target = self.predict()
+		acc_num = 0.0
+		
+		for i, indent in enumerate(self.__y):
+			if indent == target[i]:
+				acc_num += 1
+
+		return {'acc':acc_num/len(target), 'target':target}
 	
 	#when model is setted, using the model to decision
 	def decision(self, sample_vector):
@@ -59,7 +70,7 @@ class SVM:
 		#need to opimize
 		kernel = Kernel(self.__model['kernel_type'], self.__model['gamma'])
 
-		for i, sv in self.__model['sv'].items():
+		for sv in self.__model['sv']:
 			sum += sv['ya'] * kernel.fun(sv['vector'], sample_vector)
 
 		if sum + self.__model['rho'] < 0:
@@ -71,34 +82,36 @@ class SVM:
 
 	#load svm model file to memory
 	def load_model(self, model_file):
-		lines = open(model_file).readlines()
+		lines = []
+		for line in open(model_file):
+			if line.startswith('#'):
+				continue
+			line = line.strip()
+			line = line.strip("\n") #may can not work in across defferent OS
+			if len(line) == 0: continue
+			lines.append(line)
+
 		if len(lines) < 7:
 			raise Exception, 'SVM model file format error'
 		
-		#过滤注释，还是要for
 		self.__model = {}
-		s = lines[0].strip().strip("\n").split(':')
-		self.__model['kernel_type'] = s[1]
-		s = lines[1].trip().strip("\n").plit(':')
-		self.__model['gamma'] = float(s[1])
-		s = lines[2].strip().strip("\n").split(':')
-		self.__model['rho'] = float(s[1])
-		s = lines[3].strip().strip("\n").split(':')
-		self.__model['cost'] = float(s[1])
+		for head in lines[:4]:
+			s = head.split(':')
+			if len(s) != 2:
+				raise Exception, 'SVM model file format error'
+			if s[0] == 'kernel_type':
+				self.__model['kernel_type'] = s[1]
+			else:
+				self.__model[s[0]] = float(s[1])
 		
-		self.__model = []
-		for line in self.__model[4:]:
-			if line.startswith('#'):
-				continue
-
-			line = line.strip()
-			line = line.strip("\n") #may can not work in across defferent OS
-			fields = line.split(' ')#in default,space is used to split
-			point = {}
-			point['ya']int(fields.pop(0))
+		self.__model['sv'] = []
+		for body in lines[4:]:
+			fields = body.split(' ')#in default,space is used to split
 			fields = map(lambda x:float(x), fields)
-			point['vector'] = fields
-			self.__model.append(ponit)
+			point = {}
+			point['ya'] = fields[0]
+			point['vector'] = fields[1:]
+			self.__model['sv'].append(point)
 
 	#if model_file is None ,return string content of model file,otherwise wirte to file
 	def save_model(self, is_ret = False):
@@ -110,15 +123,15 @@ class SVM:
 		else:
 			#output head
 			print '#This is file of SVM model from sample training'
-			print "kernel_type:%s"%(self._model['kernel_type'])
-			print "gamma:%s"%(self._model['gamma'])
-			print "rho:%s"%(self._model['rho'])
-			print "cost:%s"%(self._model['cost'])
+			print "kernel_type:%s"%(self.__model['kernel_type'])
+			print "gamma:%s"%(self.__model['gamma'])
+			print "rho:%s"%(self.__model['rho'])
+			print "cost:%s"%(self.__model['cost'])
 			#output body
 			print '' #print spliting line
 			str = ''
 			for i in self.__model['sv']:
-				str = "%d"%(i['ya'])
+				str = "%g"%(i['ya'])
 				for v in i['vector']:
 					str += " %g"%(v)
 				print str
@@ -141,45 +154,3 @@ class SVM:
 		return True
 
 ####
-
-#The interface for CLI
-#We package the python module interface into CLI by explaining command argment
-
-def exit_with_help():
-	print '''
-usage:./svm train|predict []file
-options:
--t 
-	'''
-	exit(1)
-
-def main():
-	param = {}
-	#set default settings
-	param['cmd'] = 'train'
-	param['train_file'] = ''
-	param['predict_file'] = ''
-	param['predict_accuracy'] = False #wheather calculter predict accucy
-	param['c'] = 5
-	param['g'] = 5
-	
-	i  = 1
-	while i < len(sys.argv):
-		if sys.argv[i] == '-t':
-			i += 1
-			param['cmd'] = 'train'
-		elif sys.argv[i] == '-p':
-			i += 1
-			param['cmd'] = 'predict'
-		elif sys.argv[i] == '-a':
-			i += 1
-			param['predict_accuracy'] = True
-	
-	svm = SVM('DNA.train')
-	svm.train()
-	model  = svm.save_model()
-	svm = SVM('DNA.test')
-	print svm.predict(model)
-
-if __name__ == '__main__':
-	main()

@@ -61,7 +61,7 @@ class SMO:
 	__E = {} #store the value of error
 	__active_set = [] #contain the alpha index that is bounded
 	__eps = 10 ** -3
-	__tol = 0.01
+	__tol = 0.001
 
 	def __init__(self, y, x, l, c = 5, g = 5, k_type = 'rbf'):
 		self.__y = y
