@@ -1,10 +1,11 @@
 import math
+import random
 #define kernal funciton
 class Kernel:
-	__gamma = None#The gamma paramter in kernel function
-	__kernel_function = None #kernel function ponitor
-
 	def __init__(self, k_type, g):
+		self.__gamma = None#The gamma paramter in kernel function
+		self.__kernel_function = None #kernel function ponitor
+
 		if k_type == 'rbf':
 			self.__kernel_function = self.__kernel_rbf
 		elif k_type == 'linear':
@@ -41,11 +42,12 @@ class Kernel:
 		return sum
 ########## end of kernel
 
-def calculate_obj():
+#def calculate_obj():
 
 '''
-smo algorithm is packaged into a class
-The main algorithm is realized by the fake code in Platt`s paper
+smo algorithm is packaged into a class.
+The main algorithm is realized by the fake code in Platt`s paper.
+In the algorithm,we don`t handle the condition where training points is unbalance.
 '''
 class SMO:
 	__y = [] #target set
@@ -54,18 +56,19 @@ class SMO:
 	__alpha = []
 	__l = 0 #the train point length
 	__c = 0
-	__g = 0
+	__g = 0 #gamma
 	__kernel = [] #store the value of kernal
-	__E = [] #store the value of error
+	__E = {} #store the value of error
 	__active_set = [] #contain the alpha index that is bounded
 	__eps = 10 ** -3
-	__tos = 0.01
+	__tol = 0.01
 
-	def __init__(self, y, x, l, k_type = 'rbf', c = 5, g = 5):
+	def __init__(self, y, x, l, c = 5, g = 5, k_type = 'rbf'):
 		self.__y = y
 		self.__x = x
 		self.__l = l
 		self.__c = c
+		self.__g = g
 		
 		#initialize alpha array
 		for i in range(l):
@@ -77,7 +80,7 @@ class SMO:
 		#initialize error array
 		for i in range(l):
 			self.update_error(i)
-
+		
 	def __init_kernel(self, k_type):
 		kernel = Kernel(k_type, self.__c)
 
@@ -94,15 +97,15 @@ class SMO:
 		max_iter = 100000
 		iter = 0
 		#find the first alpha in outter cycle
-		while iter < max_iter and (num_changed > 0 or examin_all):
+		while iter < max_iter and (num_changed > 0 or examine_all):
 			iter += 1
 			num_changed = 0
 			if examine_all:
 				for i in range(self.__l):
-					num_changed += examine_example(i)
+					num_changed += self.examine_example(i)
 			else:
 				for i in self.__active_set:
-					num_changed += examine_example(i)
+					num_changed += self.examine_example(i)
 
 			if examine_all == 1:
 				examine_all = 0
@@ -111,29 +114,35 @@ class SMO:
 
 		if iter >= max_iter:
 			 raise Exception, 'out of max iteration times'
+		
+		#return bounded alpha value
+		alpha = []
+		for i, v in enumerate(self.__alpha):
+			if v > 0 and v < self.__c:
+				alpha.append((i, v))
 
-		return (self.__alpha, self.__b)
+		return (alpha, self.__b)
 
 	#the inner cycle where find the second alpha
 	def examine_example(self, i2):
 		y2 = self.__y[i2]
-		r2 = self.__E[i] * y2
+		r2 = self.__E[i2] * y2
 
-		if un_kkt(i2):
+		if self.un_kkt(i2):
 			if len(self.__active_set) > 1:
-				i1 = search_max_error(i2)
-				if take_step(i1, i2):
+				i1 = self.search_max_error(i2)
+				if self.take_step(i1, i2):
 					return 1
 
-			ramdom.shuffle(self.__active)
+			random.shuffle(self.__active_set)
 			for i in self.__active_set:
-				if take_step(i, i2):
+				if self.take_step(i, i2):
 					return 1
 
 			all = range(self.__l)
 			random.shuffle(all)
 			for i in all:
-				if take_step(i, i2):
+				if self.take_step(i, i2):
 					return 1
 
 		return 0
@@ -143,8 +152,8 @@ class SMO:
 		max_diff = 0
 
 		for i in range(self.__l):
-			if abs(self.__E[i] - self.__E[j]) > max_diff:
-				max_diff = abs(self.__E[i] - self.__E[j])
+			if abs(self.__E[i] - self.__E[i2]) > max_diff:
+				max_diff = abs(self.__E[i] - self.__E[i2])
 				max_i = i
 		
 		return max_i
@@ -160,14 +169,14 @@ class SMO:
 			H = min(self.__c, self.__c + self.__alpha[i2] - self.__alpha[i1])
 		else:
 			L = max(0, self.__alpha[i2] + self.__alpha[i1] - self.__c)
-			H = min(c, self.__alpha[i2] + self.__alpha[i1])
+			H = min(self.__c, self.__alpha[i2] + self.__alpha[i1])
 
 		if L == H:
 			return False
 
-		k11 = self.__kernel(i1, i1)
-		k12 = self.__kernel(i1, i2)
-		k22 = self.__kernel(i2, i2)
+		k11 = self.__kernel[i1][i1]
+		k12 = self.__kernel[i1][i2]
+		k22 = self.__kernel[i2][i2]
 		eta =  2 * k12 - k11 - k22
 
 		#usually,the eta is less than 0
@@ -191,7 +200,7 @@ class SMO:
 				a2 = L
 			elif Lobj > Hobj + self.__eps:
 				a2 = H
-			else
+			else:
 				a2 = self.__alpha[i2]
 
 		#if a2 has not enough increase
@@ -204,7 +213,7 @@ class SMO:
 		if a1 > 0 and a1 < self.__c:
 			if i1 not in self.__active_set:
 				self.__active_set.append(i1)
-		elif il in self.__active_set:
+		elif i1 in self.__active_set:
 			self.__active_set.remove(i1)
 		
 		if a2 > 0 and a2 < self.__c:
@@ -215,26 +224,26 @@ class SMO:
 
 		#update threshold b
 		b1 = self.__b - self.__E[i1] - \
-			 self.__y[i1] * (a1 - self.__alpha[i1]) * self.__kernel(i1, i1) - \
-			 self.__y[i2] * (a2 - self.__alpha[i2]) * self.__kernel(i2, i1)
+			 self.__y[i1] * (a1 - self.__alpha[i1]) * self.__kernel[i1][i1] - \
+			 self.__y[i2] * (a2 - self.__alpha[i2]) * self.__kernel[i2][i1]
 		b2 = self.__b - self.__E[i2] - \
-			 self.__y[i1] * (a1 - self.__alpha[i1]) * self.__kernel(i1, i2) - \
-			 self.__y[i2] * (a2 - self.__alpha[i2]) * self.__kernel(i2, i2)
+			 self.__y[i1] * (a1 - self.__alpha[i1]) * self.__kernel[i1][i2] - \
+			 self.__y[i2] * (a2 - self.__alpha[i2]) * self.__kernel[i2][i2]
 		if a1 > 0 and a1 < self.__c:
-			b = b1
+			self.__b = b1
 		elif a2 > 0 and a2 < self.__c:
-			b = b2
+			self.__b = b2
 		else:
-			b = (b1 + b2) / 2
-
+			self.__b = (b1 + b2) / 2
+	
 		#update alpha
 		self.__alpha[i1] = a1
 		self.__alpha[i2] = a2
 		#try to find wheather need to write to active set
 
 		#update error to cache
-		update_error(i1)
-		update_error(i2)
+		self.update_error(i1)
+		self.update_error(i2)
 
 		return True
 
@@ -242,10 +251,10 @@ class SMO:
 	def update_error(self, i_u):
 		sum = 0
 
-		for i in renge(self.__l):
+		for i in range(self.__l):
 			sum += self.__alpha[i] * self.__y[i] * self.__kernel[i][i_u]
 
-		self.__E[i_u] = sum + self.__b + self.__y[i_u]
+		self.__E[i_u] = sum - self.__y[i_u] + self.__b
 	
 	def un_kkt(self, i):
 		ri = self.__E[i] * self.__y[i]
