@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 import sys
+import threading
+from Queue import Queue
+from Queue import Empty
+from svm import SVM
 
 #return C,g grid data
 def init_cg():
@@ -14,59 +18,81 @@ def init_cg():
 	
 	grid['g'] = []
 	for g in range(g_min, g_max, g_step):
-		grid['g'] += [2 ** c]
+		grid['g'] += [2 ** g]
 
 	return grid
 
-#when the data is very large,load feature vector by requitment
-def load_train_set(scale_train_file):
-	feature_matrix = []
-	feature_vector = []
-
-	for line in open(scale_train_file):
-		fields = line.split()
-		fea
-
-	return []
-
-#use multi thread to quicken calculate
-def search(scale_train_data, cg_grid):
-	return {'c':0, 'g':0}
-
-class worker(threading.Thread):
-	def __init__(self):
+#the thread which do cross validate
+class Worker(threading.Thread):
+	def __init__(self, train_file, work_queue, result_queue):
 		threading.Thread.__init__(self)
-		self.work_queue = Queue()
-		self.result_queue = Queue()
-
-	def add_work(self, work_item):
-		return self.work_queue.put(work_item)
-	
-	def get_result(self):
-		return self.result_queue.get()
+		self.work_queue = work_queue
+		self.result_queue = result_queue
+		self.train_file = train_file
 
 	def run(self):
-		self.calculate_SVM()
+		while True:
+			try:
+				cg = self.work_queue.get_nowait()
+				svm = SVM(sys.argv[1])
+				avg_acc = svm.cross_validate(cg[0],cg[1])
+				self.result_queue.put((cg[0], cg[1], avg_acc))
+			except Empty:
+				return
 
-	def calculate_SVM(self):
-		#call svm module
-		return 
-
-def exit_with_help():
+def usage():
 	print """
-usage:./find_cg.py scale_train_file
+usage:./search_cg.py scale_train_file
 	"""
-	exit(1)
 
 def main():
 	if len(sys.argv) < 2:
-		exit_with_help()
+		usage()
+		exit(1)
 
-	scale_train_data = load_train_set(sys.argv[1])
 	cg_grid = init_cg()
 
-	cg = cv_find(scale_train_data, cg_grid)
-	for key,value in cg.items():
-		print "%s:%d"%(key, value)
+	#all of blow will cause a dead lock,when put task into queue
+	#add task to worker
+	work_queue = Queue()
+	result_queue = Queue()
+	#avg_acc = []
+	for cost in cg_grid['c']:
+		for g in cg_grid['g']:
+			work_queue.put((cost, g))
+	
+	#create work thread
+	worker = []
+	for i in range(4):
+		work = Worker(sys.argv[1], work_queue, result_queue)
+		work.start()
+		worker.append(work)
+	#wait for worker finish
+	for i in worker:
+		i.join()
 
-main()
+	#get result
+	avg_acc = []
+	while True:
+		try:
+			avg_acc.append(result_queue.get(False))
+		except Empty:
+			break
+	#get the most optimization cost and gamma
+	op_c = avg_acc[0][0]
+	op_g = avg_acc[0][1]
+	max_acc = avg_acc[0][2]
+	for i in avg_acc:
+		if i[2] < max_acc:
+			continue
+		elif i[2] == max_acc and i[0] >= op_c:
+			continue
+		op_c = i[0]
+		op_g = i[1]
+		max_acc = i[2]
+
+	print "cost:%g gamma:%g acc:%g"%(op_c, op_g, max_acc)
+			
+
+if __name__ == '__main__':
+	main()

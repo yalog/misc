@@ -1,5 +1,26 @@
 import math
 import random
+'''
+Code Tree
+	class Kernel:
+	-functions
+		__init__(self, k_type, g)
+		__kernel_rbf(self, x1, x2)
+		__kernel_linear(self, x1, x2)
+		__kernel_poly(self, x1, x2)
+		__kernel_sigmoid(self, x1, x2)
+	
+	class SMO:
+	-functions
+		__init__(self, y, x, l, c = 5, g = 5, k_type = 'rbf')
+		solve(self)
+		examine_example(self, i2)
+		search_max_error(self, i2)
+		take_step(self, i1, i2)
+		update_error(self, i_u)
+		un_kkt(self, i)
+'''
+
 #define kernal funciton
 class Kernel:
 	def __init__(self, k_type, g):
@@ -10,6 +31,10 @@ class Kernel:
 			self.__kernel_function = self.__kernel_rbf
 		elif k_type == 'linear':
 			self.__kernel_function = self.__kernel_linear
+		elif k_type == 'poly':
+			self.__kernel_function = self.__kernel_poly
+		elif k_type == 'sigmoid':
+			self.__kernel_function = self.__kernel_sigmoid
 		else:
 			raise Exception, 'specified kernel type error'
 
@@ -40,6 +65,12 @@ class Kernel:
 		for i, value in enumerate(x1):
 			sum += x1[i] * x2[i]
 		return sum
+	
+	def __kernel_poly(self, x1, x2):
+		return (self.__gamma * self.__dot(x1, x2)) ** 3
+	
+	def __kernel_sigmoid(self, x1, x2):
+		return math.tanh(self.__gamma * self.__dot(x1, x2))
 ########## end of kernel
 
 #def calculate_obj():
@@ -50,25 +81,23 @@ The main algorithm is realized by the fake code in Platt`s paper.
 In the algorithm,we don`t handle the condition where training points is unbalance.
 '''
 class SMO:
-	__y = [] #target set
-	__x = [] #train point set
-	__b = 0  #the threshold b of the SVM
-	__alpha = []
-	__l = 0 #the train point length
-	__c = 0
-	__g = 0 #gamma
-	__kernel = [] #store the value of kernal
-	__E = {} #store the value of error
-	__active_set = [] #contain the alpha index that is bounded
 	__eps = 10 ** -3
 	__tol = 0.001
 
 	def __init__(self, y, x, l, c = 5, g = 5, k_type = 'rbf'):
-		self.__y = y
-		self.__x = x
-		self.__l = l
-		self.__c = c
-		self.__g = g
+		self.__y = y #target set
+		self.__x = x #train point set
+		self.__l = l #the train point length
+		self.__c = c #cost paramter
+		self.__g = g #gamma in kernel function
+
+		self.__b = 0  #the threshold b of the SVM
+		self.__alpha = [] #the lagrance multiplier
+		self.__kernel = [] #store the value of kernel
+		self.__E = {} #store the value of error
+		self.__active_set = [] #contain the alpha index that is bounded
+
+
 		
 		#initialize alpha array
 		for i in range(l):
@@ -125,6 +154,7 @@ class SMO:
 
 	#the inner cycle where find the second alpha
 	def examine_example(self, i2):
+		#print self.__alpha
 		y2 = self.__y[i2]
 		r2 = self.__E[i2] * y2
 
@@ -135,6 +165,10 @@ class SMO:
 					return 1
 
 			random.shuffle(self.__active_set)
+			#to sure that each of the convergence results is equals in the same sample data and cost
+			#and selecting different first alpha at everytime
+			#if len(self.__active_set) > 0:
+			#	self.__active_set.append(self.__active_set.pop(0))
 			for i in self.__active_set:
 				if self.take_step(i, i2):
 					return 1

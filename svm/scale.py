@@ -3,12 +3,12 @@
 The program is used to scale feature data(orignal training data).
 Before scaling,We must put all feature data into one file
 '''
-import sys
+import sys, getopt
 
 def load_sample(feature_file):
 	feature = {'target':[], 'matrix':[]}
 
-	for line in open(feature_file):
+	for line in feature_file:
 		if line.startswith('#'):
 			continue
 
@@ -55,23 +55,38 @@ def normalize_feature_matrix(feature_matrix):
 
 	return feature_matrix
 
-def usage():
-	print '''
-usage:./scale.py -h | unnormalize_feature_file
+def usage(msg = None):
+	if msg != None:
+		print msg
+		print 'Try `./scale.py -h` for more'
+	else:
+		print '''
+usage:./scale.py [options] [unnormalize_feature_file]
+options:
+-h for help,just this
+
 example:
 	./scale.py feature.data > scale_feature.data
 	'''
 
 def main():
-	if len(sys.argv) < 2:
-		usage()
+	try:
+		opts, args = getopt.getopt(sys.argv[1:], 'h')
+	except getopt.GetoptError, msg:
+		usage(msg)
 		exit(1)
-	elif sys.argv[1] == '-h':
-		usage()
-		exit(0)
+	
+	for opt, val in opts:
+		if opt == '-h':
+			usage()
+			exit()
 	
 	try:
-		feature = load_sample(sys.argv[1])
+		if len(args) > 0:
+			file = open(args[0])
+		else:
+			file = sys.stdin
+		feature = load_sample(file)
 		feature_matrix = normalize_feature_matrix(feature['matrix'])
 		#print feature_matrix
 		save_sample(feature['target'], feature_matrix)

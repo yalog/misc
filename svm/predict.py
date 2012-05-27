@@ -4,6 +4,28 @@ we use the program to train scaled sample data
 '''
 import sys
 from svm import SVM
+from texttable import Texttable
+
+def print_class(c):
+	blank = []
+	for i in range(10):
+		blank.append('   ')
+	table = Texttable()
+	table.set_deco(Texttable.HEADER)
+	for cs,item in c.items():
+		table.header(blank)
+		print "Class identifier: %g"%(cs)
+		row = []
+		for i in item:
+			row.append(i)
+			if len(row) == 10:
+				table.add_row(row)
+				row = []
+		if len(row) != 0 and len(row) < 10:
+			row += blank[(len(row)):]
+			table.add_row(row)
+		print table.draw()
+		table.reset()
 
 def usage():
 	print '''
@@ -36,7 +58,20 @@ def main():
 			else:
 				target = svm.predict()
 			print 'Classified Result:'
-			print target
+			classcified = {}
+			for index, target in target.items():
+				if target not in classcified:
+					classcified[target] = []
+				classcified[target].append(index+1)
+			'''
+			for t,i in classcified.items():
+				print "class %g: "%(t),
+				for j in i:
+					print "%g, "%(j),
+				print ''
+			'''
+			print_class(classcified)
+
 		except IOError, msg:
 			print msg
 			exit(1)

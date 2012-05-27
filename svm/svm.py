@@ -6,9 +6,21 @@ from smo import SMO
 from smo import Kernel
 
 '''
-This is a interface for both CLI and python module.
+This is a interface for python module.
 At this version,we use whole vector matrix,but thin vector matrix.
 And the version just realized binary classify
+
+Code Tree:
+	Class SVM:
+	-funtions
+		train(self, cost = 5, gamma = 0.5, kernel_type = 'rbf')
+		predict(self)
+		predict_known(self)
+		decision(self, sample_vector)
+		load_model(self, model_file)
+		save_model(self, is_ret = False)
+		load_sample(self, sample_file)
+		cross_validate(self, cost, gamma, k = 2, kernel_type = 'rbf')
 '''
 
 #The interface for python
@@ -91,7 +103,7 @@ class SVM:
 			if len(line) == 0: continue
 			lines.append(line)
 
-		if len(lines) < 7:
+		if len(lines) < 6:
 			raise Exception, 'SVM model file format error'
 		
 		self.__model = {}
@@ -137,7 +149,7 @@ class SVM:
 				print str
 
 
-	#laod self defined train data format
+	#load self defined train data format
 	def load_sample(self, sample_file):
 		for line in open(sample_file):
 			if line.startswith('#'):
@@ -150,7 +162,47 @@ class SVM:
 			fields = map(lambda x:float(x), fields)
 			self.__x.append(fields)
 
-	def cross_validate(k = 2):
-		return True
+	#cross validate and return average accuracy rate
+	def cross_validate(self, cost, gamma, k = 2, kernel_type = 'rbf'):
+		x = self.__x
+		y = self.__y
+		accs = []
+		valid_set = {}
 
-####
+		#divide train set into k group
+		for i,v in enumerate(x):
+			try:
+				valid_set[i % k].append(i)
+			except KeyError:
+				valid_set[i % k] = []
+				valid_set[i % k].append(i)
+
+		for i, valid in valid_set.items():
+			#train
+			self.__x = []
+			self.__y = []
+			for i,v in enumerate(x):
+				if i not in valid:
+					self.__x.append(x[i])
+					self.__y.append(y[i])
+			self.train(cost, gamma, kernel_type)
+
+			#predict
+			self.__x = []
+			self.__y = []
+			for i in valid:
+				self.__x.append(x[i])
+				self.__y.append(y[i])
+			predict = self.predict_known()
+			accs.append(predict['acc'])
+			
+		#calculate average accuracy rate
+		sum = 0.0
+		for i in accs:
+			sum += i
+		
+		self.__x = x
+		self.__y = y
+
+		return sum / len(accs)
+#### end of SVM
